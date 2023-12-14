@@ -1,13 +1,11 @@
 package com.binhan.registerapi.controllers;
 
+import com.binhan.registerapi.dto.request.AuthenticationRequest;
 import com.binhan.registerapi.service.AuthenticationService;
 import com.binhan.registerapi.service.impl.AuthenticationServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.naming.InvalidNameException;
@@ -27,7 +25,11 @@ public class AuthController {
         if(file == null){
             return ResponseEntity.status(400).body("cant find certificate file");
         }
-        authenticationService.saveUser(file,username,password);
-        return ResponseEntity.ok("ok");
+        return ResponseEntity.ok(authenticationService.saveUser(file,username,password));
+    }
+
+    @PostMapping("/authenticate")
+    public ResponseEntity<?> authenticate(@RequestBody AuthenticationRequest request) {
+        return ResponseEntity.ok(authenticationService.authenticate(request));
     }
 }
