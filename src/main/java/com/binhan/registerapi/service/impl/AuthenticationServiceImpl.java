@@ -12,9 +12,8 @@ import com.binhan.registerapi.service.AuthenticationService;
 import lombok.RequiredArgsConstructor;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
-import org.bouncycastle.asn1.x509.CRLDistPoint;
-import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.*;
+import org.bouncycastle.x509.extension.X509ExtensionUtil;
 import org.json.JSONObject;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
@@ -44,7 +43,6 @@ import java.util.*;
 
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1Primitive;
-import org.bouncycastle.asn1.x509.AuthorityInformationAccess;
 
 import static java.nio.file.Files.createTempFile;
 
@@ -164,35 +162,36 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private String getDistributionCRL(X509Certificate cert) throws IOException {
-        byte[] extensionValue = cert.getExtensionValue(Extension.cRLDistributionPoints.getId());
-
-        // Extract the CRLDistributionPoints
-        ASN1InputStream asn1In = new ASN1InputStream(extensionValue);
-        ASN1OctetString crlDistPointsOctetString = ASN1OctetString.getInstance(asn1In.readObject());
-        asn1In.close();
-
-        ASN1InputStream asn1In2 = new ASN1InputStream(crlDistPointsOctetString.getOctets());
-        CRLDistPoint crlDistPoints = CRLDistPoint.getInstance(asn1In2.readObject());
-        asn1In2.close();
-        return String.valueOf(crlDistPoints);
+        String url = null;
+        byte[] crlPointExtValue = cert.getExtensionValue(X509Extensions.CRLDistributionPoints.getId());
+        CRLDistPoint distPoint = CRLDistPoint.getInstance(X509ExtensionUtil.fromExtensionValue(crlPointExtValue));
+        for (DistributionPoint dp : distPoint.getDistributionPoints()) {
+            DistributionPointName dpn = dp.getDistributionPoint();
+            if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
+                GeneralNames generalNames = GeneralNames.getInstance(dpn.getName());
+                for (GeneralName generalName : generalNames.getNames()) {
+                    if (generalName.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                        url = generalName.getName().toString();
+                    }
+                }
+            }
+        }
+        return url;
     }
 
 
     private String getAuthInfoAccess(X509Certificate cert) throws IOException {
-        // Get the AuthorityInformationAccess extension
-        byte[] extensionValue = cert.getExtensionValue(Extension.authorityInfoAccess.getId());
-        // Extract the AuthorityInformationAccess
-        ASN1InputStream asn1In = new ASN1InputStream(extensionValue);
-        ASN1Primitive derObject = asn1In.readObject();
-        asn1In.close();
-        if (derObject instanceof DEROctetString) {
-            DEROctetString derOctetString = (DEROctetString) derObject;
-            byte[] aiaBytes = derOctetString.getOctets();
-            ASN1InputStream aiaIn = new ASN1InputStream(aiaBytes);
-            AuthorityInformationAccess aia = AuthorityInformationAccess.getInstance(aiaIn.readObject());
-            return String.valueOf(aia);
+        String url = null;
+        byte[] aiaExtValue = cert.getExtensionValue(X509Extensions.AuthorityInfoAccess.getId());
+        AuthorityInformationAccess aia = AuthorityInformationAccess.getInstance(X509ExtensionUtil.fromExtensionValue(aiaExtValue));
+        for (AccessDescription ad : aia.getAccessDescriptions()) {
+            if (ad.getAccessMethod().equals(AccessDescription.id_ad_ocsp)) {
+                if (ad.getAccessLocation().getTagNo() == GeneralName.uniformResourceIdentifier) {
+                    url = ad.getAccessLocation().getName().toString();
+                }
+            }
         }
-        return null;
+        return url;
     }
 
     private String getAuthKeyIdentifier(X509Certificate cert) {

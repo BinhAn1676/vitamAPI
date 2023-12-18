@@ -1,4 +1,5 @@
 package com.binhan.registerapi.security;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -7,7 +8,9 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import java.security.Key;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import java.security.*;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,25 +19,25 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    private static final String SECRET_KEY="alOEWT3lBsGuCBxEOGi/1VpexvO4K1IEuZMVbRERvaQOnTT6NjG/1Hf1lqI9WJwX";
+    private static final String SECRET_KEY = "alOEWT3lBsGuCBxEOGi/1VpexvO4K1IEuZMVbRERvaQOnTT6NjG/1Hf1lqI9WJwX";
 
-    public String extractUsername(String token){
-        return extractClaim(token,Claims::getSubject);
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
     }
 
-    public <T> T extractClaim(String token, Function<Claims,T> claimsResolver){
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
 
-    public String generateToken(UserDetails userDetails){
-        return generateToken(new HashMap<>(),userDetails);
+    public String generateToken(UserDetails userDetails) {
+        return generateToken(new HashMap<>(), userDetails);
     }
 
     public String generateToken(
-            Map<String,Object> extractClaims,
+            Map<String, Object> extractClaims,
             UserDetails userDetails
-    ){
+    ) {
         return Jwts
                 .builder()
                 .setClaims(extractClaims)
@@ -45,7 +48,7 @@ public class JwtService {
                 .compact();
     }
 
-    public boolean isTokenValid(String token,UserDetails userDetails){
+    public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
@@ -55,10 +58,10 @@ public class JwtService {
     }
 
     private Date extractExpiration(String token) {
-        return extractClaim(token,Claims::getExpiration);
+        return extractClaim(token, Claims::getExpiration);
     }
 
-    private Claims extractAllClaims(String token){
+    private Claims extractAllClaims(String token) {
         return Jwts
                 .parserBuilder()
                 .setSigningKey(getSignInKey())
@@ -71,4 +74,35 @@ public class JwtService {
         byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
         return Keys.hmacShaKeyFor(keyBytes);
     }
+
+
+    //generate RSA key
+    public KeyPair generateRSAKeyPair(String[] args) throws NoSuchAlgorithmException {
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+        keyPairGenerator.initialize(2048);
+        return keyPairGenerator.generateKeyPair();
+    }
+
+    //generate ECDSA key
+    public KeyPair generateECDSAKeyPair() throws NoSuchAlgorithmException, NoSuchProviderException {
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("ECDSA", "SunEC");
+        keyPairGenerator.initialize(256);
+        return keyPairGenerator.generateKeyPair();
+    }
+    //generate AES key
+
+    public SecretKey generateAESKey() throws NoSuchAlgorithmException {
+        KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
+        keyGenerator.init(256);
+        return keyGenerator.generateKey();
+    }
+
+    //generate ECDH key
+
+    public KeyPair generateECDHKeyPair() throws NoSuchAlgorithmException {
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("ECDH");
+        keyPairGenerator.initialize(256);
+        return keyPairGenerator.generateKeyPair();
+    }
+
 }
